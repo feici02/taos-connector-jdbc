@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "*"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up JDK
+        uses: actions/setup-java@v2
+        with:
+          distribution: "temurin"
+          java-version: "11"
+
+      - name: Build with Maven
+        run: mvn clean package -DskipTests
+
+      - name: List target directory
+        run: ls -la target
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          body: |
+            Changes in this release:
+            - Description of changes
+          draft: false
+          prerelease: false
+
+      - name: Generate MD5 Checksums
+        run: |
+          for file in target/taos-jdbcdriver-*.jar; do
+            md5sum $file > $file.md5
+          done
+
+      - name: Upload Release Assets
+        run: |
+          tag_name=${{ github.ref }}
+          tag_name=${tag_name/refs\/tags\//}
+          for file in target/taos-jdbcdriver-*.jar; do
+            echo "Uploading $file and $file.md5..."
+            gh release upload $tag_name $file --clobber
+            gh release upload $tag_name $file.md5 --clobber
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
